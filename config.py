@@ -23,42 +23,65 @@ def load_configuration(path: Union[pathlib.Path, str]):
         raise Exception("config type not supported.")
 
 
-class MetaConfig(type):
-    def __new__(mcs, *args, **kwargs):
-        cls = super().__new__(mcs, *args, **kwargs)
-        cls._config = {}
-        return cls
+class ClassPropertyDescriptor(object):
 
-    def load(self, config: dict):
+    def __init__(self, fget, fset=None):
+        self.fget = fget
+        self.fset = fset
+
+    def __get__(self, obj, klass=None):
+        if klass is None:
+            klass = type(obj)
+        return self.fget.__get__(obj, klass)()
+
+    def __set__(self, obj, value):
+        if not self.fset:
+            raise AttributeError("can't set attribute")
+        type_ = type(obj)
+        return self.fset.__get__(obj, type_)(value)
+
+    def setter(self, func):
+        if not isinstance(func, (classmethod, staticmethod)):
+            func = classmethod(func)
+        self.fset = func
+        return self
+
+
+class ClassPropertyMetaClass(type):
+    def __setattr__(self, key, value):
+        obj = None
+        if key in self.__dict__:
+            obj = self.__dict__.get(key)
+
+        if obj and type(obj) is ClassPropertyDescriptor:
+            return obj.__set__(self, value)
+
+        return super(ClassPropertyMetaClass, self).__setattr__(key, value)
+
+
+def classproperty(func):
+    if not isinstance(func, (classmethod, staticmethod)):
+        func = classmethod(func)
+    return ClassPropertyDescriptor(func)
+
+
+def make_closure(val):
+    def closure(*args, **kwargs):
+        return val
+    return closure
+
+
+class Config(metaclass=ClassPropertyMetaClass):
+
+    @classmethod
+    def load(cls, config: dict):
         for k, v in config.items():
             if isinstance(v, dict):
-                nested = MetaConfig(k, (), {})
+                nested = type(cls)(k, (), {})
                 nested.load(v)
-                config[k] = nested
-
-        self._config.update(config)
-
-    def __getattr__(cls, name: str):
-        # defend against recursion
-        if name == '_config':
-            raise AttributeError()
-
-        # support only case insensitive access
-        name = name.lower()
-        if name in cls._config:
-            return cls._config[name]
-
-        raise AttributeError()
-
-    def __setattr__(cls, name: str, value: Any):
-        if hasattr(cls, "_config") and name in cls._config:
-            raise Exception("Config is read only")
-        else:
-            super().__setattr__(name, value)
-
-
-class Config(metaclass=MetaConfig):
-    pass
+                setattr(cls, k, classproperty(make_closure(nested)))
+            else:
+                setattr(cls, k, classproperty(make_closure(v)))
 
 
 class JsonConfig(Config):
@@ -66,12 +89,12 @@ class JsonConfig(Config):
     def load(path: pathlib.Path):
         with open(path, 'r') as f:
             config = json.load(f)
-        Config.load(config)
+        super().load(config)
 
 
 class IniConfig(Config):
     @staticmethod
     def load(path: pathlib.Path):
         config = configparser.parse(path)
-        Config.load(config)
+        super().load(config)
 
