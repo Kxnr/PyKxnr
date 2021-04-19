@@ -1,10 +1,11 @@
+from collections import abc
 import configparser
 import json
 import pathlib
 import logging
 import os
 
-from typing import Union, Any
+from typing import Union, Any, Iterator, _T_co, _KT, _VT_co, _VT
 
 
 def load_configuration(path: str):
@@ -44,7 +45,7 @@ class ClassPropertyDescriptor(object):
         return self
 
 
-class ClassPropertyMetaClass(type):
+class ClassPropertyMetaClass(type, abc.Mapping):
     def __setattr__(self, key, value):
         obj = None
         if key in self.__dict__:
@@ -63,6 +64,18 @@ class ClassPropertyMetaClass(type):
                 setattr(cls, k, classproperty(make_closure(nested)))
             else:
                 setattr(cls, k, classproperty(make_closure(v)))
+
+    # TODO: inherit metaclass to keep ClassProperty clean
+    # support dictionary-like access and iteration
+    # for applications that expect dictionaries
+    def __getitem__(self, k: _KT) -> _VT_co:
+        return getattr(self, k)
+
+    def __len__(self) -> int:
+        return len(a for a in dir(self) if isinstance(a, ClassPropertyDescriptor))
+
+    def __iter__(self) -> Iterator[_T_co]:
+        return (a, getattr(self, a) for a in dir(self) if isinstance(a, ClassPropertyDescriptor))
 
 
 def classproperty(func):
