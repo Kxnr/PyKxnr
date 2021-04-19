@@ -75,7 +75,7 @@ class ClassPropertyMetaClass(type, abc.Mapping):
         return len(a for a in dir(self) if isinstance(a, ClassPropertyDescriptor))
 
     def __iter__(self) -> Iterator[_T_co]:
-        return (a, getattr(self, a) for a in dir(self) if isinstance(a, ClassPropertyDescriptor))
+        return ((a, getattr(self, a)) for a in dir(self) if isinstance(a, ClassPropertyDescriptor))
 
 
 def classproperty(func):
