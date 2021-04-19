@@ -5,7 +5,7 @@ import pathlib
 import logging
 import os
 
-from typing import Union, Any, Iterator, _T_co, _KT, _VT_co, _VT
+from typing import Union, Any, Iterator
 
 
 def load_configuration(path: str):
@@ -68,14 +68,14 @@ class ClassPropertyMetaClass(type, abc.Mapping):
     # TODO: inherit metaclass to keep ClassProperty clean
     # support dictionary-like access and iteration
     # for applications that expect dictionaries
-    def __getitem__(self, k: _KT) -> _VT_co:
+    def __getitem__(self, k: str) -> Any:
         return getattr(self, k)
 
     def __len__(self) -> int:
         return len(a for a in dir(self) if isinstance(a, ClassPropertyDescriptor))
 
-    def __iter__(self) -> Iterator[_T_co]:
-        return (a, getattr(self, a) for a in dir(self) if isinstance(a, ClassPropertyDescriptor))
+    def __iter__(self) -> Iterator[str]:
+        return (a for a in dir(self) if isinstance(a, ClassPropertyDescriptor))
 
 
 def classproperty(func):
