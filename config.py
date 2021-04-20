@@ -1,11 +1,8 @@
-from collections import abc
-from abc import ABCMeta
 import configparser
 import json
 import pathlib
 import os
-
-from typing import Any, Iterator
+from .frozendict import frozendict
 
 
 def load_configuration(path: str):
@@ -45,7 +42,7 @@ class ClassPropertyDescriptor(object):
         return self
 
 
-class ClassPropertyMetaClass(ABCMeta):
+class ClassPropertyMetaClass(type):
     def __setattr__(self, key, value):
         obj = None
         if key in self.__dict__:
@@ -69,7 +66,7 @@ def make_closure(val):
     return closure
 
 
-class ConfigComponent(abc.Mapping, ClassPropertyMetaClass):
+class ConfigComponent(ClassPropertyMetaClass):
     def load(cls, config: dict):
         for k, v in config.items():
             if isinstance(v, dict):
@@ -78,24 +75,21 @@ class ConfigComponent(abc.Mapping, ClassPropertyMetaClass):
                 setattr(cls, k, classproperty(make_closure(nested)))
             else:
                 setattr(cls, k, classproperty(make_closure(v)))
+                
+    def freeze(cls):
+        def deep_freeze(cls, k):
+            val = getattr(cls, k)
+            if isinstance(val, ConfigComponent):
+                return val.freeze()
+            return val
 
-    def __getitem__(cls, k: str) -> Any:
-        return getattr(cls, k)
-
-    def __len__(cls) -> int:
-        return len(tuple(v for v in cls.__dict__.values() if isinstance(v, ClassPropertyDescriptor)))
-
-    def __iter__(cls) -> Iterator[str]:
-        return (k for k, v in cls.__dict__.items() if isinstance(v, ClassPropertyDescriptor))
-
-    @classmethod
-    def __subclasses__(cls):
-        return super().__subclasses__(cls)
+        return frozendict({k: deep_freeze(cls, k) for k, v in cls.__dict__.items()
+                           if isinstance(v, ClassPropertyDescriptor)})
 
 
 class Config(metaclass=ConfigComponent):
     def __init__(self):
-        raise Exception("Config is class acess only")
+        raise Exception("Config allows class access only")
 
 
 class JsonConfig(Config):
