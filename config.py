@@ -1,11 +1,11 @@
 from collections import abc
+from abc import ABCMeta
 import configparser
 import json
 import pathlib
-import logging
 import os
 
-from typing import Union, Any, Iterator
+from typing import Any, Iterator
 
 
 def load_configuration(path: str):
@@ -45,7 +45,7 @@ class ClassPropertyDescriptor(object):
         return self
 
 
-class ClassPropertyMetaClass(type, abc.Mapping):
+class ClassPropertyMetaClass(ABCMeta):
     def __setattr__(self, key, value):
         obj = None
         if key in self.__dict__:
@@ -55,27 +55,6 @@ class ClassPropertyMetaClass(type, abc.Mapping):
             return obj.__set__(self, value)
 
         return super(ClassPropertyMetaClass, self).__setattr__(key, value)
-
-    def load(cls, config: dict):
-        for k, v in config.items():
-            if isinstance(v, dict):
-                nested = ClassPropertyMetaClass(k, (), {})
-                nested.load(v)
-                setattr(cls, k, classproperty(make_closure(nested)))
-            else:
-                setattr(cls, k, classproperty(make_closure(v)))
-
-    # TODO: inherit metaclass to keep ClassProperty clean
-    # support dictionary-like access and iteration
-    # for applications that expect dictionaries
-    def __getitem__(self, k: str) -> Any:
-        return getattr(self, k)
-
-    def __len__(self) -> int:
-        return len(tuple(v for v in self.__dict__.values() if isinstance(v, ClassPropertyDescriptor)))
-
-    def __iter__(self) -> Iterator[str]:
-        return (k for k, v in self.__dict__.items() if isinstance(v, ClassPropertyDescriptor))
 
 
 def classproperty(func):
@@ -90,8 +69,33 @@ def make_closure(val):
     return closure
 
 
-class Config(metaclass=ClassPropertyMetaClass):
-    pass
+class ConfigComponent(abc.Mapping, ClassPropertyMetaClass):
+    def load(cls, config: dict):
+        for k, v in config.items():
+            if isinstance(v, dict):
+                nested = ConfigComponent(k, (), {})
+                nested.load(v)
+                setattr(cls, k, classproperty(make_closure(nested)))
+            else:
+                setattr(cls, k, classproperty(make_closure(v)))
+
+    def __getitem__(cls, k: str) -> Any:
+        return getattr(cls, k)
+
+    def __len__(cls) -> int:
+        return len(tuple(v for v in cls.__dict__.values() if isinstance(v, ClassPropertyDescriptor)))
+
+    def __iter__(cls) -> Iterator[str]:
+        return (k for k, v in cls.__dict__.items() if isinstance(v, ClassPropertyDescriptor))
+
+    @classmethod
+    def __subclasses__(cls):
+        return super().__subclasses__(cls)
+
+
+class Config(metaclass=ConfigComponent):
+    def __init__(self):
+        raise Exception("Config is class acess only")
 
 
 class JsonConfig(Config):
@@ -107,4 +111,3 @@ class IniConfig(Config):
     def load(path: pathlib.Path):
         config = configparser.parse(path)
         super().load(config)
-
