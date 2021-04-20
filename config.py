@@ -5,20 +5,20 @@ import pathlib
 import logging
 import os
 
-from typing import Union, Any, Iterator, _T_co, _KT, _VT_co, _VT
+from typing import Union, Any, Iterator
 
 
 def load_configuration(path: str):
-    if not os.path.exists(str):
+    if not os.path.exists(path):
         raise Exception("config not found")
 
-    config_type = os.path.splitext(path)
-    if config_type == 'json':
+    _, config_type = os.path.splitext(path)
+    if config_type == '.json':
         JsonConfig.load(path)
-    elif config_type == 'ini':
+    elif config_type == '.ini':
         IniConfig.load(path)
     else:
-        raise Exception("config type not supported.")
+        raise Exception(f"config type '{config_type}' not supported.")
 
 
 class ClassPropertyDescriptor(object):
@@ -68,14 +68,14 @@ class ClassPropertyMetaClass(type, abc.Mapping):
     # TODO: inherit metaclass to keep ClassProperty clean
     # support dictionary-like access and iteration
     # for applications that expect dictionaries
-    def __getitem__(self, k: _KT) -> _VT_co:
+    def __getitem__(self, k: str) -> Any:
         return getattr(self, k)
 
     def __len__(self) -> int:
-        return len(a for a in dir(self) if isinstance(a, ClassPropertyDescriptor))
+        return len(tuple(v for v in self.__dict__.values() if isinstance(v, ClassPropertyDescriptor)))
 
-    def __iter__(self) -> Iterator[_T_co]:
-        return ((a, getattr(self, a)) for a in dir(self) if isinstance(a, ClassPropertyDescriptor))
+    def __iter__(self) -> Iterator[str]:
+        return (k for k, v in self.__dict__.items() if isinstance(v, ClassPropertyDescriptor))
 
 
 def classproperty(func):
