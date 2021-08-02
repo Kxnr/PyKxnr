@@ -1,4 +1,5 @@
 from collections import abc
+import pickle
 import copy
 
 # adapted from https://github.com/slezica/python-frozendict
@@ -8,6 +9,12 @@ import copy
 def copy_mutable():
     pass
 
+def hash_mutable(item):
+    try:
+        return hash(item)
+    except TypeError:
+        p = pickle.dumps(item)
+        return hash(p)
 
 class frozendict(abc.Mapping):
     dict_cls = dict
@@ -42,5 +49,17 @@ class frozendict(abc.Mapping):
 
     def __hash__(self):
         if self._hash is None:
-            self._hash = hash(repr(self))
+            self._hash = hash(frozenset(hash_mutable(a) for a in self.items()))
+
         return self._hash
+
+if __name__ == "__main__":
+    test_dict = {'int': 1, 
+                 'dict': {'a': "words", 1: 163}, 
+                 'tup': (11, 'word', [1, 'a', 6]),
+                 'list': [156, 'yydk', 223]}
+
+    test_1 = frozendict(test_dict)
+    test_2 = frozendict(**test_dict)
+
+    assert hash(test_1) == hash(test_2)
