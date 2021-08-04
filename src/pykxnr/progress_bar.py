@@ -4,7 +4,8 @@ import sys
 from time import sleep
 
 try:
-    from ipywidgets import Output
+    from ipywidgets import Output, display
+
 except ImportError:
     pass
 
@@ -80,5 +81,21 @@ class ProgressBar:
         self.display(bar)
 
 
-class JupyterProgressBar:
-    pass
+class JupyterProgressBar(ProgressBar):
+    def __init__(self, *args, **kwargs):
+        self.bar = Output()
+        self.out = Output()
+
+    def display(self, value):
+        self.bar.clear_output(wait=True)
+        with self.bar:
+           sys.stdout.write(value)
+
+        # show output widgets in notebook
+        display(self.bar)
+        display(self.out)
+
+    def _print(self, *args, **kwargs):
+        # print output to a separate display widget
+        with self.out:
+            builtins.print(*args, **kwargs)
