@@ -12,24 +12,33 @@ Not intended for integration into any production system.
 '''
 
 
-class LoggerTCPHandler(socketserver.BaseRequestHandler):
+class LoggerTCPHandler(socketserver.StreamRequestHandler):
     def handle(self):
-        pkt_len, = struct.unpack('>L', self.recv_size(4))
-        msg = pickle.loads(self.recv_size(pkt_len))
-        record = logging.makeLogRecord(msg)
-        logging.getLogger('receiver').handle(record)
+        while True:
+            try:
+                pkt_len, *_ = struct.unpack('>L', self.recv_size(4))
+                msg = pickle.loads(self.recv_size(pkt_len))
+            except ConnectionError:
+                self.finish()
+                return
+
+            record = logging.makeLogRecord(msg)
+            logging.getLogger('receiver').handle(record)
 
     def recv_size(self, size):
         msg = b''
-        # TODO: timeout
         while len(msg) < size:
             msg += self.request.recv(size - len(msg))
+
+            if len(msg) == 0:
+                raise ConnectionError("Socket Disconnected")
+
 
         return msg
 
 
 def unpack_log(port=55555):
-    with socketserver.TCPServer(('127.0.0.1', port), LoggerTCPHandler) as server:
+    with socketserver.ThreadingTCPServer(('127.0.0.1', port), LoggerTCPHandler) as server:
         server.serve_forever()
 
 
@@ -72,7 +81,8 @@ config_dict = {
     "loggers": {
         "receiver": {
             "level": "DEBUG",
-            "handlers": ["receiver"]
+            "handlers": ["receiver"],
+            "propagate": False
         }
     },
     "handlers": {
@@ -81,7 +91,7 @@ config_dict = {
             "level": "DEBUG",
             "formatter": "stack_indicator",
             "host": '127.0.0.1',
-            "port": '55555'
+            "port": 55555
         },
         "receiver": {
             "class": "logging.StreamHandler",
