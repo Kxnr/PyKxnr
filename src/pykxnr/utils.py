@@ -14,7 +14,8 @@ def clamp(n, low, high):
     :param high: upper bound or None
     :return: clamped value
     '''
-    return min(max(n, low if low is not None else n), high if high is not None else n)
+    return min(max(n, low if low is not None else float('-inf')), 
+                      high if high is not None else float('inf'))
 
 
 def make_path(path):
