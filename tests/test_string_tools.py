@@ -1,6 +1,7 @@
 from unittest import TestCase
 from pykxnr.string_tools import *
 
+
 class TestStringMethods(TestCase):
     def test_split_on_indices(self):
         test_str = 'a' * 10
