@@ -1,4 +1,4 @@
-from inspect import currentframe
+from inspect import currentframe, signature
 import logging.config
 import logging
 import socketserver
@@ -51,6 +51,7 @@ class ColoredFormatter(logging.Formatter):
     '''
     def __init__(self, palette=color_palette, *args, **kwargs):
         self.palette = palette
+        # subset args to currently supported options
         super().__init__(*args, **kwargs)
 
     def format(self, record):
@@ -102,15 +103,14 @@ config_dict = {
     },
     "formatters": {
         "stack_indicator": {
-            "format": "{asctime} {levelname: ^8} [{module}:{funcName}:{lineno}] {message}",
+            "fmt": "{asctime} {levelname: ^8} [{module}:{funcName}:{lineno}] {message}",
             "style": "{"
         },
         "colored_stack_indicator": {
             "()": ColoredFormatter,
-            "format": "{_color:green}{asctime}{_color:endcolor} {_color:{levelname}}{levelname: ^8}"
+            "fmt": "{_color:green}{asctime}{_color:endcolor} {_color:{levelname}}{levelname: ^8}"
                       + "{_color:endcolor} [{module}:{funcName}:{lineno}] {message}",
             "style": "{",
-            "validate": False
         }
     }
 }
